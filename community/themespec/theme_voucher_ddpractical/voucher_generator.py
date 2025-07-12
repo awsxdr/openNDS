@@ -18,7 +18,7 @@ def randomstring(length=4):
 
 def new_voucher():
     voucher_code = f"{randomstring()}-{randomstring()}"
-    return f"{voucher_code},{rate_down},{rate_up},{quota_down},{quota_up},{validity},0\n"
+    return f"{voucher_code},{rate_down},{rate_up},{quota_down},{quota_up},{validity},0,00:00:00:00:00:00\n"
 
 filepath="vouchers.txt"
 with open(filepath, "a") as voucher_file:
