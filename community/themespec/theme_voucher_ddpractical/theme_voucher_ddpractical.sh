@@ -182,7 +182,8 @@ voucher_validation() {
 	originurl=$(printf "${originurl//%/\\x}")
 
 	check_voucher
-	if [ $? -eq 0 ]; then
+	result=$?
+	if [ $result -eq 0 ]; then
 		#echo "Voucher is Valid, click Continue to finish login<br>"
 
 		# Refresh quotas with ones imported from the voucher roll.
@@ -247,7 +248,7 @@ voucher_validation() {
 		else
 			echo "$auth_fail"
 		fi
-	elif [ $? -eq 2 ]; then
+	elif [ $result -eq 2 ]; then
 		# Voucher already used on another device. Add error message here like below
 	else
 		echo "<big-red>Voucher is not Valid, click Continue to restart login<br></big-red>"
