@@ -143,9 +143,9 @@ check_voucher() {
 			voucher_expiration=$(($current_time + $voucher_time_limit * 60))
 			# Override session length according to voucher
 			sessiontimeout=$voucher_time_limit
-			sed -i -r "s/($voucher.*,)(0)/\1$current_time/" $voucher_roll
+			sed -i -r "s/($voucher,[0-9]+,[0-9]+,[0-9]+,[0-9]+,[0-9]+,)[0-9]+(,[0-9a-fA-F:]+)/\1$current_time\2/" $voucher_roll
 			# Record device MAC
-			sed -i -r "s/($voucher.*,)(00:00:00:00:00:00)/\1$clientmac/" $voucher_roll))
+			sed -i -r "s/($voucher.*,[0-9]+,[0-9]+,[0-9]+,[0-9]+,[0-9]+,[0-9]+,)00:00:00:00:00:00/\1$clientmac/" $voucher_roll
 			return 0
 		else
 			#echo "Voucher Already Used, Checking validity <br>"
