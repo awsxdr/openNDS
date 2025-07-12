@@ -9,9 +9,18 @@
 #
 
 # Title of this theme:
-title="theme_voucher"
+title="theme_voucher_ddpractical"
 
 # functions:
+
+download_image_files() {
+	# The list of images to be downloaded is defined in $ndscustomimages ( see near the end of this file )
+	# The source of the images is defined in the openNDS config
+
+	for nameofimage in $ndscustomimages; do
+		get_image_file "$nameofimage"
+	done
+}
 
 generate_splash_sequence() {
 	login_with_voucher
@@ -35,6 +44,7 @@ header() {
 		<body>
 		<div class=\"offset\">
 		<div class=\"insert\" style=\"max-width:100%;\">
+		<img src=\"$logo\" alt=\"The "DD Practical" logo, with two interlaced D letters and the word Practical in hand drawn font.\"><br>
 	"
 }
 
@@ -45,12 +55,12 @@ footer() {
 		<hr>
 		<div style=\"font-size:0.5em;\">
 			<br>
-			<img style=\"height:60px; width:60px; float:left;\" src=\"$gatewayurl""$imagepath\" alt=\"Splash Page: For access to the Internet.\">
+			<img style=\"height:35px; width:110px; float:left;\" src=\"$imagepath\" alt=\"Splash Page: For access to the Internet.\">
+			&copy; Content and graphics: DD Practical - $year<br>
 			&copy; Portal: BlueWave Projects and Services 2015 - $year<br>
-			<br>
+			&copy; Voucher system: Francesco Servida 2023 - $year<br>
 			Portal Version: $version
-			<br><br><br><br>
-		</div>
+			<br><br>		
 		</div>
 		</div>
 		</body>
@@ -111,13 +121,15 @@ check_voucher() {
  	if [ $(echo -n $output | wc -w) -ge 1 ]; then 
 		#echo "Voucher Found - Checking Validity <br>"
 		current_time=$(date +%s)
-		voucher_token=$(echo -n $output | sed -r "s#([a-zA-Z0-9-]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+)#\1#")
-		voucher_rate_down=$(echo -n $output | sed -r "s#([a-zA-Z0-9-]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+)#\2#")
-		voucher_rate_up=$(echo -n $output | sed -r "s#([a-zA-Z0-9-]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+)#\3#")
-		voucher_quota_down=$(echo -n $output | sed -r "s#([a-zA-Z0-9-]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+)#\4#")
-		voucher_quota_up=$(echo -n $output | sed -r "s#([a-zA-Z0-9-]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+)#\5#")
-		voucher_time_limit=$(echo -n $output | sed -r "s#([a-zA-Z0-9-]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+)#\6#")
-		voucher_first_punched=$(echo -n $output | sed -r "s#([a-zA-Z0-9-]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+)#\7#")
+		voucher_regex="([a-zA-Z0-9-]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9]+),([0-9a-fA-F:]+)"
+		voucher_token=$(echo -n $output | sed -r "s#$voucher_regex#\1#")
+		voucher_rate_down=$(echo -n $output | sed -r "s#$voucher_regex#\2#")
+		voucher_rate_up=$(echo -n $output | sed -r "s#$voucher_regex#\3#")
+		voucher_quota_down=$(echo -n $output | sed -r "s#$voucher_regex#\4#")
+		voucher_quota_up=$(echo -n $output | sed -r "s#$voucher_regex#\5#")
+		voucher_time_limit=$(echo -n $output | sed -r "s#$voucher_regex#\6#")
+		voucher_first_punched=$(echo -n $output | sed -r "s#$voucher_regex#\7#")
+		voucher_device_id=$(echo -n $output | sed -r "s#$voucher_regex#\8#")
 		
 		# Set limits according to voucher
 		upload_rate=$voucher_rate_up
@@ -132,13 +144,18 @@ check_voucher() {
 			# Override session length according to voucher
 			sessiontimeout=$voucher_time_limit
 			sed -i -r "s/($voucher.*,)(0)/\1$current_time/" $voucher_roll
+			# Record device MAC
+			sed -i -r "s/($voucher.*,)(00:00:00:00:00:00)/\1$clientmac/" $voucher_roll))
 			return 0
 		else
 			#echo "Voucher Already Used, Checking validity <br>"
 			# Current timestamp <= than Punch Timestamp + Validity (minutes) * 60 secs/minute
 			voucher_expiration=$(($voucher_first_punched + $voucher_time_limit * 60))
 
-			if [ $current_time -le $voucher_expiration ]; then
+			if [ $clientmac -ne $voucher_device_id]; then
+				#echo "Voucher has already been activated on another device <br>"
+				return 1
+			elif [ $current_time -le $voucher_expiration ]; then
 				time_remaining=$(( ($voucher_expiration - $current_time) / 60 ))
 				#echo "Voucher is still valid - You have $time_remaining minutes left <br>"
 				# Override session length according to voucher
@@ -171,7 +188,7 @@ voucher_validation() {
 		# Refresh quotas with ones imported from the voucher roll.
 		quotas="$sessiontimeout $upload_rate $download_rate $upload_quota $download_quota"
 		# Set voucher used (useful if for accounting reasons you track who received which voucher)
-		userinfo="$title - $voucher"
+		userinfo="$title, voucher=$voucher, user=$username, email=$emailaddress, tos=$tos, signup=$signup"
 
 		# Authenticate and write to the log - returns with $ndsstatus set
 		auth_log
@@ -265,16 +282,30 @@ voucher_form() {
 			Welcome!
 		</med-blue><br>
 		<hr>
-		Your IP: $clientip <br>
-		Your MAC: $clientmac <br>
-		<hr>
+		
+		<img style=\"width:100%; max-width: 100%;\" src=\"$banner1\" alt=\"Dani, a white woman with vibrant pink hair wearing sunflower dungarees & yellow t-shirt hand sews a piece of leatherwork in her workshop. Behind her on the teal walls, a variety of hand tools, colourful threads, and small parts are hung on white boards above the workbench and the assorted tools of her work.\"><br>
+		<b>$banner1_message</b><hr>
+
+		<italic-black>
+			To access the Internet, please enter your name, email address and voucher code below.<br>
+			Vouchers can be purchased from Dani at the DD Practical Leather Craft stall.<br>
+			You can also sign up to our newsletter by ticking the box below.
+		</italic-black>
+		<p>
 		<form action=\"/opennds_preauth/\" method=\"get\">
+			<input type=\"hidden\" name=\"fas\" value=\"$fas\">
+			Name<BR><input type=\"text\" name=\"username\" value=\"$username\" autocomplete=\"on\" required ><br><br>
+			Email<BR><input type=\"email\" name=\"emailaddress\" value=\"$emailaddress\" autocomplete=\"on\" required><br><br>
 			<input type=\"hidden\" name=\"fas\" value=\"$fas\"> 
+			Code<br><input type=\"text\" name=\"voucher\" value=\"$voucher_code\" required><br><br>
 			<input type=\"checkbox\" name=\"tos\" value=\"accepted\" required> I accept the Terms of Service<br>
-			Voucher #: <input type=\"text\" name=\"voucher\" value=\"$voucher_code\" required><br>
+			<input type=\"checkbox\" name=\"signup\" value=\"accepted\"> I wish to sign up to the DDPractical newsletter<br>
+
+			<br>
 			<input type=\"submit\" value=\"Connect\" >
 		</form>
 		<br>
+
 	"
 
 	read_terms
@@ -289,6 +320,11 @@ read_terms() {
 			<input type=\"hidden\" name=\"terms\" value=\"yes\">
 			<input type=\"submit\" value=\"Read Terms of Service   \" >
 		</form>
+	<hr>
+		Your IP: $clientip <br>
+		Your MAC: $clientmac <br>
+
+
 	"
 }
 
@@ -308,15 +344,22 @@ display_terms() {
 			By logging in to the system, you grant your permission for this system to store any data you provide for
 			the purposes of logging in, along with the networking parameters of your device that the system requires to function.<br>
 			All information is stored for your convenience and for the protection of both yourself and us.<br>
-			All information collected by this system is stored in a secure manner and is not accessible by third parties.<br>
+			All information collected by this system is stored in a secure manner and is not accessible by third parties in accordance with current GDPR best practice.<br>
+			By ticking the 'Signup' box you grant your permission for us to occasionally send you marketing emails; You may remove this permition at anytime by emailing hello@ddpractical.co.uk with the subject line 'GDPR unsubscribe'.<br>
+			Accepting to recive promotional emails is not conditional for use of this service.<br>
+			
+
 		</b><hr>
 	"
 
 	# Terms of Service
 	echo "
 		<b style=\"color:red;\">Terms of Service for this Hotspot.</b> <br>
-		<b>Access is granted on a basis of trust that you will NOT misuse or abuse that access in any way.</b><hr>
+		<b>Access is granted on a basis of trust that you will NOT misuse or abuse that access in any way.</b>
+		<P>We aim to keep this service running constantly, However our system runns entirly off grid and is powered by batteries and suported by solar pannels.
+		In the event of low amounts of sunshine we may need to turn the system off occasionaly in order to conserve energie, particularly overnight.<hr>
 		<b>Please scroll down to read the Terms of Service in full or click the Continue button to return to the Acceptance Page</b>
+		
 		<form>
 			<input type=\"button\" VALUE=\"Continue\" onClick=\"history.go(-1);return true;\">
 		</form>
@@ -473,16 +516,15 @@ quotas="$sessiontimeout $upload_rate $download_rate $upload_quota $download_quot
 # Define the list of Parameters we expect to be sent sent from openNDS ($ndsparamlist):
 # Note you can add custom parameters to the config file and to read them you must also add them here.
 # Custom parameters are "Portal" information and are the same for all clients eg "admin_email" and "location" 
-ndscustomparams=""
-ndscustomimages=""
-ndscustomfiles=""
-
+ndscustomparams="input logo_message banner1_message banner2_message banner3_message"
+ndscustomimages="logo_png banner1_jpg banner2_jpg banner3_jpg"
+ndscustomfiles="advert1_htm"
 ndsparamlist="$ndsparamlist $ndscustomparams $ndscustomimages $ndscustomfiles"
 
 # The list of FAS Variables used in the Login Dialogue generated by this script is $fasvarlist and defined in libopennds.sh
 #
 # Additional custom FAS variables defined in this theme should be added to $fasvarlist here.
-additionalthemevars="tos voucher"
+additionalthemevars="tos voucher username emailaddress signup"
 
 fasvarlist="$fasvarlist $additionalthemevars"
 
