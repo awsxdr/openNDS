@@ -154,7 +154,7 @@ check_voucher() {
 
 			if [ $clientmac != $voucher_device_id ]; then
 				#echo "Voucher has already been activated on another device <br>"
-				return 1
+				return 2
 			elif [ $current_time -le $voucher_expiration ]; then
 				time_remaining=$(( ($voucher_expiration - $current_time) / 60 ))
 				#echo "Voucher is still valid - You have $time_remaining minutes left <br>"
@@ -247,6 +247,8 @@ voucher_validation() {
 		else
 			echo "$auth_fail"
 		fi
+	elif [ $? -eq 2 ]; then
+		# Voucher already used on another device. Add error message here like below
 	else
 		echo "<big-red>Voucher is not Valid, click Continue to restart login<br></big-red>"
 		echo "
