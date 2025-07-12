@@ -152,7 +152,7 @@ check_voucher() {
 			# Current timestamp <= than Punch Timestamp + Validity (minutes) * 60 secs/minute
 			voucher_expiration=$(($voucher_first_punched + $voucher_time_limit * 60))
 
-			if [ $clientmac -ne $voucher_device_id]; then
+			if [ $clientmac != $voucher_device_id ]; then
 				#echo "Voucher has already been activated on another device <br>"
 				return 1
 			elif [ $current_time -le $voucher_expiration ]; then
